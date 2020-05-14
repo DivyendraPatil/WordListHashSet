@@ -3,84 +3,90 @@ package main
 import (
 	"bufio"
 	"fmt"
-	"log"
-	"net/http"
-	_ "net/http/pprof"
 	"os"
 	"path/filepath"
 )
 
 var hashSet = make(map[string]bool)
 
-func readFileLineByLine(file string){
-	if file != "/Volumes/WD SSD/Passwords"  {
-		// Open passed file
-		readFile, err := os.Open(file)
-		if err != nil {
-			panic(err)
-		}
+func readFiles(file string){
+	//File reader
 
-		// Open file to be written
-		writeFile, err := os.Create("/Volumes/Work/wordList.txt")
-		if err != nil {
-			panic(err)
-		}
-		// close writeFile on exit and check for its returned error
-		defer func() {
-			if err := readFile.Close(); err != nil {
-				panic(err)
-			}
-			if err := writeFile.Close(); err != nil {
-				panic(err)
-			}
-		}()
+	readFile, err := os.Open(file)
+	if err != nil {
+		fmt.Println("Error in opening reading file",err)
+		panic(err)
+	}
+	defer readFile.Close()
+	reader := bufio.NewReader(readFile)
 
-		// Initialize reader and writer from bufio
-		reader := bufio.NewReader(readFile)
-		writer := bufio.NewWriter(writeFile)
+	fileToBeWritten := "/Users/divyendrapatil/IdeaProjects/wordListHashSet/wordList.txt"
+
+	writeFile, err := os.OpenFile(fileToBeWritten, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		fmt.Println("Error in opening writing file")
+		panic(err)
+	}
+	defer writeFile.Close()
+	writer := bufio.NewWriter(writeFile)
+
+	if file != "/Users/divyendrapatil/IdeaProjects/wordListHashSet/testGround" {
 
 		for {
-			line, _, err := reader.ReadLine()
+			line := ""
+			line, err := reader.ReadString('\n')
 			if err != nil {
+				//fmt.Println("Error in reading line",err)
 				break
 			}
-			stringLine := string(line)
-			_, present := hashSet[stringLine]
-			if present != true && len(stringLine) > 5 {
-				// fmt.Println(stringLine)
-				hashSet[stringLine] = true
-
-				// Write to file
-				if _, err := writer.WriteString(stringLine+"\n"); err != nil {
-					panic(err)
+			_, present := hashSet[line]
+			lineCondition := checkLineCondition(present,line)
+			if lineCondition == false {
+				hashSet[line] = true
+				_, err := writer.WriteString(line)
+				if err != nil {
+					fmt.Printf("Error in writing",err)
 				}
+				//fmt.Printf("Line %s ", line)
 			}
+
 		}
-		if err = writer.Flush(); err != nil {
-			panic(err)
+		err := writer.Flush()
+		if err != nil {
+			fmt.Printf("Error in flushing",err)
 		}
 	}
+}
+
+func checkLineCondition(present bool,line string) (condition bool){
+	length := len(line)
+	if present == false && length > 5 && length < 20 {
+		return false
+	}
+	return true
 }
 
 func main() {
 	var files []string
 
+	// root := "/Users/divyendrapatil/IdeaProjects/wordListHashSet/testGround"
 	root := "/Volumes/WD SSD/Passwords"
 	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		files = append(files, path)
 		return nil
 	})
 	if err != nil {
+		fmt.Println("Error in Walking through directory")
+		fmt.Println(err)
 		panic(err)
 	}
 
-	go func() {
-		log.Println(http.ListenAndServe("localhost:6060", nil))
-	}()
+	//go func() {
+	//	log.Println(http.ListenAndServe("localhost:6060", nil))
+	//}()
 
 	for _, file := range files {
-		fmt.Println("Reading => ",file)
-		readFileLineByLine(file)
-		printMemUsage()
+		printMemUsage(file)
+		readFiles(file)
 	}
 }
